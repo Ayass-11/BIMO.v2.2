@@ -1,0 +1,333 @@
+BIMO.v1 - Revizyon Notlari (Kod Inceleme Sonrasi)
+==================================================
+
+Not
+---
+Bu belge, BIMO.v1 projesi icin gonderilen ilk uygulama dosyalarinin teknik
+incelemesi sonrasinda hazirlanmistir. Amac, dogrudan duzeltilmis kod vermek
+degil; mevcut yapinin guclu taraflarini, kirilgan noktalarini ve duzeltilmesi
+gereken alanlari duzenli bir sekilde ortaya koymaktir.
+
+Bu belge hazirlanirken su nokta da goz onunde bulundurulmustur:
+Projenin ilk dili bilerek Ingilizceye sabitlenmistir. Bu bir hata olarak
+degil, bilincli bir ilk surum karari olarak degerlendirilmelidir.
+Turkce ve iki dilli destek daha sonraki fazlarda ele alinacaktir.
+
+
+1) Genel Degerlendirme
+----------------------
+Mevcut dosyalar placeholder seviyesini asmaktadir. Ortada yalnizca bos bir
+iskelet degil, gercekten birbirine bagli calisan bir ilk prototip zinciri
+bulunmaktadir.
+
+Bu zincir su asamalari kapsar:
+- ses alma
+- STT
+- LLM
+- TTS
+- state gecisleri
+- controller orkestrasyonu
+
+Bu, projenin soyut tasarim asamasindan cikarak gercek implementasyon
+asamasina gectigini gosterir.
+
+Ancak su anki haliyle sistem:
+- ilk prototip adayi
+- ama henuz saglamlastirilmis bir v1 cekirdegi degil
+
+Bunun sebebi, ana akis kurulmus olsa da bazi kirilgan durumlarin henuz guvenli
+sekilde ele alinmamis olmasidir.
+
+
+2) Guclu Taraflar
+-----------------
+Mevcut implementasyonda olumlu bulunan temel noktalar su sekildedir:
+
+2.1) Katman ayrimi genel olarak dogru yonde
+Controller, STT, LLM, TTS ve state dosyalari ayri tutulmustur.
+Bu, proje buyurken daginiklik riskini azaltir.
+
+2.2) Controller mantigi sade
+Controller dosyasi genel akisi yonetmeye calisiyor, her isi kendi icinde
+cozmeye calismiyor. Bu, orkestrasyon rolunun dogru anlasildigini gosterir.
+
+2.3) State yapisi temiz
+State dosyasi gereksiz buyutulmeden sade tutulmustur.
+Bu, ilk surum icin dogru karardir.
+
+2.4) Push-to-talk secimi dogru
+Surekli dinleme yerine ilk asamada push-to-talk mantigiyla ilerlenmesi,
+zorluk seviyesini kontrollu tutmak acisindan mantiklidir.
+
+2.5) LLM tarafinda konusma gecmisi dusunulmus
+Mesaj gecmisi tutuluyor olmasi, ileride sohbet hissini guclendirecek bir
+zemin olusturur.
+
+2.6) Gercek araclar kullanilmaya baslanmis
+Ollama, faster-whisper ve Piper gibi bilesenlerin sisteme baglanmasi,
+projenin artik yalnizca teorik olmadigini gostermektedir.
+
+
+3) Temel Teknik Riskler
+-----------------------
+
+3.1) Bos veya cok kisa ses girdisi
+Su an sistemin en kirilgan noktalarindan biri budur.
+
+Risk:
+Kullanici space tusuna cok kisa sure basarsa veya anlamli veri uretecek kadar
+ses kaydi olusmazsa, ses zinciri bazi yerlerde sorun cikarabilir.
+
+Bu durumun sonucunda:
+- ses parcalari bos kalabilir
+- birlestirme adimi hata verebilir
+- STT anlamsiz veya bos sonuc dondurebilir
+- sistem gereksiz yere LLM katmanina ilerleyebilir
+
+Bu nedenle ilk guclendirme adimlarindan biri, bos/kisa girislerin guvenli
+sekilde ele alinmasi olmalidir.
+
+3.2) Bos transkripsiyon kontrolu eksikligi
+STT katmani bos metin dondurebilir. Bu teknik olarak normaldir.
+Ama controller tarafinda bu durum ozel olarak ele alinmiyorsa, sistem bos veya
+anlamsiz girdiyi modele gonderebilir.
+
+Bu da:
+- gereksiz model cagrisi
+- anlamsiz cevaplar
+- kotu kullanici deneyimi
+olusturur.
+
+3.3) Hata yonetiminin fazla genel olmasi
+Controller ve TTS tarafinda genel hata yakalama mantigi var.
+Ilk prototipte bu kabul edilebilir olsa da, su an hata kaynagi yeterince ayri
+gorunur degildir.
+
+Ornegin:
+- hata STT'de mi oldu?
+- LLM hostuna baglanirken mi oldu?
+- TTS modeli mi bulunamadi?
+- ses oynatma mi patladi?
+
+Bunlarin ayri dusunulebilmesi gerekir.
+
+3.4) Runtime bagimliliklarinin kirilgan olmasi
+Kod yapisi placeholder degil, fakat calisma ortami hala bazi dis kosullara
+baglidir.
+
+Bunlar:
+- Ollama servisinin ayakta olmasi
+- secilen modelin gercekten indirilmis olmasi
+- faster-whisper kurulumunun dogru olmasi
+- piper komutunun PATH icinde bulunmasi
+- aplay aracinin sistemde calisiyor olmasi
+- keyboard kutuphanesinin hedef ortamda sorun cikarmamasi
+
+Yani mimari olgunlasiyor olsa da runtime ortami hala dikkatle test edilmelidir.
+
+
+4) Dosya Bazli Revizyon Notlari
+-------------------------------
+
+4.1) controller.py
+------------------
+Olumlu:
+- Akis sirasi dogru kurulmus
+- State gecisleri gorunur
+- Controller kendi rolu disina fazla tasmiyor
+
+Revizyon gereken noktalar:
+- Bos transkripsiyon durumunu ayri ele almak gerekir
+- Her hatayi tek tip ele almak debug kalitesini dusurur
+- ERROR durumundan sonra toparlanma davranisi tasarim olarak netlestirilmelidir
+
+Yol gosterici not:
+Controller sistemin orkestra sefidir.
+Is yapan katmanlari cagirir, ama onlarin yerine gecmez.
+Bu rol korunmalidir.
+
+4.2) llm.py
+-----------
+Olumlu:
+- Host ve model parametreleri acik
+- Mesaj gecmisi tutuluyor
+- respond fonksiyonu tek sorumluluga yakin duruyor
+
+Revizyon gereken noktalar:
+- History sinirsiz buyuyor
+- Persona/system davranisi tanimli degil
+- Model/host erisim hatalarina ozel davranis dusunulmeli
+
+Onemli not:
+Modelin Ingilizce secilmesi ve ilk dilin bilincli olarak Ingilizceye
+sabitlenmesi hata degildir. Bu, v1'in kontrollu kapsam karari olarak
+degerlendirilmelidir.
+Dolayisiyla "dil sabitleme" bu asamada problem degil; bilincli tercih olarak
+devam edebilir.
+Ancak ileride iki dilli genisleme dusunuluyorsa, llm katmaninda dil/prompt/
+persona genislemesine acik bir alan birakilmalidir.
+
+4.3) main.py
+------------
+Olumlu:
+- Push-to-talk mantigi ilk surum icin uygun
+- Ses kaydi fonksiyonu ayri tutulmus
+- Ana bilesenleri kurup akisi calistirma mantigi genel olarak dogru
+
+Revizyon gereken noktalar:
+- Cok kisa kayitta bos ses parcasi olusma riski var
+- Keyboard kutuphanesi bazi Linux ortamlarinda problem cikartabilir
+- Sonsuz dongude kontrollu cikis stratejisi dusunulmeli
+- Ses alma mantigi simdilik burada olabilir ama ilerde ayrilabilecek bir katman oldugu bilinmeli
+
+4.4) stt.py
+-----------
+Olumlu:
+- Sesin float32'ye cevrilmesi ve normalize edilmesi mantikli
+- STT katmaninin gorevi temiz tutulmus
+
+Revizyon gereken noktalar:
+- Bos veya anlamsiz ses girdilerinde davranis daha net dusunulmeli
+- STT basarisizligi ile "konusma anlasilmadi" durumu zihinsel olarak ayrilmalidir
+
+Dil notu:
+STT dilinin Ingilizceye sabitlenmesi mevcut plan ile uyumludur.
+Bu nedenle su an bunu degistirmek zorunlu degildir.
+Ancak v2 veya sonraki asamalarda Turkce ve iki dilli destek eklenecekse,
+dil secimi config veya ayri bir karar mekanizmasina tasinabilir.
+
+4.5) tts.py
+-----------
+Olumlu:
+- Piper kullanimi dogru yonde
+- PATH kontrolu yapilmasi iyi
+- TTS katmani digerlerinden ayrilmis
+
+Revizyon gereken noktalar:
+- Model dosyasinin gercekten var oldugu dogrulanmiyor
+- Ses formatina dair varsayimlar testle dogrulanmali
+- Hata bilgisi daha anlamli hale getirilebilir
+
+Dil notu:
+Eger v1 boyunca hedef dil Ingilizce ise, Ingilizce ses modelinin kullanilmasi
+su an icin tutarlidir.
+Dolayisiyla burada temel sorun "yanlis dil secimi" degil; secimin acik,
+dogrulanmis ve test edilmis olmasidir.
+
+4.6) state.py
+-------------
+Olumlu:
+- Temiz
+- Gereksiz buyumemis
+- Ilk surum icin yeterli
+
+Su asamada buyutulmesi gerekmez.
+Bu dosya sade kalabilir.
+
+
+5) Sistem Duzeyinde En Onemli Revizyon Basliklari
+-------------------------------------------------
+
+5.1) Dil hattinin kontrollu sekilde tek dilli tutulmasi
+Bu noktada onceki incelemedeki en onemli duzeltme sunu acikca vurgulamaktir:
+Ingilizceye sabitleme bu projede bilincli alinmis bir ilk faz kararidir.
+
+Bu nedenle:
+- STT'nin Ingilizce calismasi
+- TTS'nin Ingilizce model kullanmasi
+- LLM konusma hattinin Ingilizce odakli olmasi
+
+mevcut v1 kapsaminda teknik bir hata olarak degil, kontrollu sadelestirme
+karari olarak degerlendirilmelidir.
+
+Yani bu asamada hedef:
+once tek dilde stabil, tekrarli ve guvenilir bir sesli sohbet zinciri kurmaktir.
+
+Daha sonra:
+- Turkce destek
+- iki dilli gecis
+- otomatik dil secimi
+gibi konular ele alinabilir.
+
+5.2) Bos giris ve bos transkripsiyon guvenligi
+Ilk guclendirme alani budur.
+Sistem her kullanici davranisinda ideal veri almayacaktir.
+Bu nedenle:
+- bos kayit
+- kisa kayit
+- anlasilmayan kayit
+- bos metin
+gibi durumlarin guvenli akista ele alinmasi gerekir.
+
+5.3) Runtime bagimliliklarinin tek tek dogrulanmasi
+Sistemin calisiyor gorunmesi yeterli degildir.
+Asagidaki bilesenlerin gercekten saglam calistigi tek tek dogrulanmalidir:
+- Ollama host
+- secilen model
+- STT yuklenmesi
+- piper bulunabilirligi
+- ses oynatma zinciri
+- klavye ile tetikleme davranisi
+
+5.4) History buyumesi
+LLM tarafindaki mesaj gecmisi ilk prototipte faydali olsa da sinirsiz buyume
+ileride gecikme ve kalite problemi yaratabilir.
+Bunun icin sinir koyma veya ozetleme gibi bir strateji ileride dusunulmelidir.
+
+
+6) Onceki Revizyondan Farkli Olarak Netlestirilen Nokta
+-------------------------------------------------------
+Bu belgede onceki teknik yorumdan farkli olarak su konu netlestirilmistir:
+
+Dil secimi konusu teknik hata olarak degerlendirilmemelidir.
+Ingilizceye sabitleme bilinclidir ve v1 kapsaminda korunabilir.
+
+Dolayisiyla asagidaki ifade daha dogrudur:
+Sorun, sistemin Ingilizce olmasi degil;
+sistemin secilen tek dilde ne kadar stabil, tekrarli ve kontrollu calistigidir.
+
+Bu nedenle revizyonun odagi dil degisikligi degil, su alanlar olmalidir:
+- guvenli akis
+- hata yuzeyi
+- bagimlilik dogrulama
+- daha saglam runtime davranisi
+
+
+7) Siradaki Dogru Odak
+----------------------
+Su anda yeni ozellik eklemek yerine mevcut prototipi saglamlastirmak daha
+dogru bir stratejidir.
+
+Oncelik sirasi su sekilde dusunulmelidir:
+1. bos/kisa ses girdisini guvenli hale getirmek
+2. bos transkripsiyon akislarini ele almak
+3. runtime bagimliliklarini tek tek dogrulamak
+4. LLM history buyumesi icin bir sinir stratejisi dusunmek
+5. ancak bundan sonra yeni katmanlar veya yeni yetenekler dusunmek
+
+Bu sira korunursa proje daha az dagilir ve v1 daha guvenilir bir temel
+uzerine oturur.
+
+
+8) Sonuc
+--------
+Mevcut implementasyon, placeholder asamasini gecmis ve gercek prototip asamasina
+ulasmistir. Bu ciddi bir esiktir.
+
+En guclu taraflar:
+- modulerlik yonunde dogru bir baslangic
+- katmanlarin genel olarak ayrilmis olmasi
+- push-to-talk secimi
+- state ve controller mantiginin ilk surum icin uygun olmasi
+
+En onemli gelistirme alanlari:
+- bos/kisa giris guvenligi
+- bos transkripsiyon yonetimi
+- hata yuzeyinin daha anlamli hale gelmesi
+- runtime bagimliliklarinin saglam dogrulanmasi
+- history buyumesinin gelecekte kontrol altina alinmasi
+
+Bu notlarla birlikte proje icin en dogru teknik yargi sudur:
+BIMO.v1 artik soyut taslak degil; gercek bir ilk prototiptir.
+Simdi ihtiyac olan sey yeni ozelliklerden once, mevcut cekirdegi daha
+dayanikli ve kontrollu hale getirmektir.

@@ -1,0 +1,9 @@
+faster-whisper
+ollama
+kokoro
+misaki[en]
+sounddevice
+numpy
+pynput
+webrtcvad
+openwakeword

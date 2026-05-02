@@ -1,0 +1,389 @@
+BIMO.v2.1 - Wake Word ve Session Akisi Revizyon Notlari
+========================================================
+
+Not
+---
+Bu belge, BIMO projesinin mevcut V2.1 durumunu degerlendirmek ve bu yeni
+surumde ortaya cikan guclu taraflari, tasarim borclarini ve bir sonraki
+temizleme alanlarini netlestirmek icin hazirlanmistir.
+
+Bu surumde artik su yeni davranislar gorulmektedir:
+- wake word algilama
+- "Hey BIMO" ile session baslatma
+- session icinde tekrar tekrar konusabilme
+- "Bye BIMO" ile session kapatma
+- VAD tabanli konusma bitisi algilama
+- manuel fallback ile sistemi tamamen kaybetmeme
+
+Bu nedenle bu belge yalnizca "kod calisiyor mu?" duzeyinde degil,
+artik V2.1'in urun hissi ve mimari borcu acisindan okunmalidir.
+
+Genel teknik yargi sunlardir:
+Bu surum, onceki wake-word denemelerinden belirgin bicimde daha ileri
+ve daha dogal bir session tabanli etkilesim denemesi haline gelmistir.
+Ancak ayni zamanda yeni bir dogal yan etki de ortaya cikmistir:
+main.py ve genel akis davranisi giderek daha fazla sorumluluk tasimaya
+baslamistir.
+
+
+1) Genel Durum
+--------------
+Bu surumle birlikte BIMO:
+- tek seferlik wake algilayan denemeden cikmis
+- session tabanli bir etkileşim modeline gecmis
+- wake ve bye ayrimi kazanmis
+- "uyandir -> konus -> cevap al -> tekrar konus -> bye ile kapat"
+mantigina yaklasmistir
+
+Bu, V2.1'in ruhuna cok uygun bir gelismedir.
+Cunku V2.1'in ana hedefi:
+BIMO'yu mekanik push-to-talk deneyiminden alip,
+daha yasayan ve daha dogal akan bir etkilesim hissine tasimaktir.
+
+Bu nedenle mevcut surum,
+yalnizca teknik deneme degil;
+gercek session davranisi arayan bir ara urun olarak gorulmelidir.
+
+
+2) En Guclu Gelismeler
+----------------------
+
+2.1) Session Mantiginin Gelmesi
+-------------------------------
+Bu surumdeki en buyuk ilerleme session mantiginin gelmis olmasidir.
+
+Artik akis sadece:
+- wake algila
+- tek cevap ver
+degil;
+
+sunlar haline gelmistir:
+- wake algila
+- session ac
+- kullanici ile birden fazla tur etkilesime gir
+- bye komutu ile cik
+
+Bu davranis, BIMO'yu basit bir wake-word demosundan
+daha "yasayan" bir varliga tasir.
+Bu nedenle V2.1'in dogru cekirdegi burada gorulmektedir.
+
+2.2) Hey ve Bye Ayrimi
+----------------------
+Iki farkli wake modeli kullanman:
+- hey_bee_mo
+- bye_bee_mo
+
+teknik ve urun hissi acisindan akillica bir karardir.
+
+Neden?
+Cunku bu:
+- session baslatmayi
+- session bitirmeyi
+ayri mantiklar olarak dusundugunu gosterir.
+
+Bu urun tarafinda da guzel bir his verir:
+BIMO sadece uyandirilan degil,
+ayni zamanda kibarca "kapatilabilen" bir session varligi gibi davranir.
+
+Bu, V2.1'de guclu bir urun imzasidir.
+
+2.3) Settings Yapısının Gercekten Kullanilmaya Baslamasi
+--------------------------------------------------------
+settings.py artik yalnizca formalite degil,
+gercekten sistemi yoneten merkezlerden biri haline gelmeye baslamis gibi
+gorunmektedir.
+
+Wake threshold, bye threshold, cooldown, minimum kayit suresi, VAD ve benzeri
+secilen degerlerin tek yerde toplanmasi cok onemlidir.
+
+Bu, su faydalari getirir:
+- tuning daha kolay olur
+- deneyler daha kontrollu olur
+- sistem davranisi dağinik sabitlerle kirlenmez
+- sonraki fazlarda config mantigina gecis kolaylasir
+
+2.4) State Yapısının V2.1 Ruhuna Yaklasmasi
+-------------------------------------------
+V1 state yapisi artik yetmiyordu.
+Bu surumde passive listening, wake detected, active listening, cooldown gibi
+daha V2.1'e uygun durumlarin dusunulmus olmasi dogru bir gelismedir.
+
+Bu, her ne kadar tam bir state machine olgunluguna henuz ulasmamis olsa da,
+tasarim olarak dogru yone gidildigini gosterir.
+
+2.5) Manuel Fallback'in Korunmasi
+---------------------------------
+Wake word sistemi tam stabil olmadan manuel fallback'i koruman,
+uygulamayi test edilebilir tutmak icin dogru karardir.
+
+Bu sayede:
+- wake tarafinda sorun olsa bile BIMO tamamen olmez
+- sistemin geri kalani test edilmeye devam eder
+- urun hissi ile gelistirme guvenligi arasinda denge kurulur
+
+
+3) Bu Surumde Beliren Ana Borclar
+---------------------------------
+
+3.1) main.py Asiri Yuk Almaya Basliyor
+--------------------------------------
+Mevcut surumde main.py'nin tasidigi sorumluluklarin sayisi belirgin bicimde
+artmis gorunmektedir.
+
+Sunlari ayni yerde tasiyor olabilir:
+- wake word dinleme
+- manuel tetikleme
+- VAD ile konusma takibi
+- session loop
+- bye word denetimi
+- cooldown
+- kayit mantigi
+- bilesen olusturma
+
+Bu su an otomatik olarak "yanlis" demek degildir.
+Ama artik net bicimde bir mimari borc sinyalidir.
+
+main.py'nin rolu normalde:
+- uygulamayi baslatmak
+- sistemi ayaga kaldirmak
+- ana akis girisini vermek
+
+olmalidir.
+
+Oysa su an giderek:
+- input engine
+- session manager
+- interaction coordinator
+karisimi bir role dogru kayiyor olabilir.
+
+Bu V2.1 boyunca tolere edilebilir.
+Ama V2.1 sonrasinda temizlenmesi beklenen alanlardan biri budur.
+
+3.2) Session Akişi ile Mimari Temizlik Arasindaki Gerilim
+---------------------------------------------------------
+Session davranisi urun hissi acisindan dogru yone gitmis olsa da,
+bu davranis her zaman temiz mimari ile gelmez.
+
+Yani:
+- urun hissi artmis olabilir
+ama
+- akis daha zor okunur hale gelmis olabilir
+
+Bu su anda normaldir.
+Cunku V2.1'de esas odak "dogal etkileşim" oldugu icin bazen tasarim borcu
+gecici olarak artar.
+Onemli olan bunu fark etmektir.
+
+Bu surumdeki temel sinyal su olabilir:
+session davranisi guzel ama bunun teknik evi henuz tamamen rafine degil.
+
+3.3) State Yapisi Hala Tam Olgun Degil
+--------------------------------------
+State enum genislemis olsa da,
+soru su olmaya devam eder:
+Bu state'ler gercekten akisi modelleyen seyler mi,
+yoksa bazilari yalnizca etiket mi?
+
+Ornegin:
+- WAKE_DETECTED varsa bunun davranissal anlami net mi?
+- state gecisleri sistem mantigini kolay okutur hale getiriyor mu?
+- yoksa yalnizca sayi artisi mi oldu?
+
+Bu asamada state makinesi buyutulmus olabilir ama hala tam semantik guce
+ulasilmamis olabilir.
+Bu, sonraki rafinasyon alanlarindan biridir.
+
+3.4) Eski Akis Kalintilari
+-------------------------
+record_wake benzeri onceki akislardan kalan parcalar hala duruyorsa,
+bunlar zamanla kafa karisikligi yaratabilir.
+
+Bu tip alanlarin riski su:
+- su an aktif akis hangisi?
+- hangisi onceki prototipten kalan yol?
+- hangisi fallback?
+- hangisi artik kullanilmiyor?
+
+Bu sorular artmaya baslarsa teknik borc da artar.
+
+Bu nedenle V2.1 belirli bir noktaya oturdugunda,
+artik aktif olmayan akislarin ve gecici denemelerin temizlenmesi gerekecektir.
+
+
+4) Ozellikle Dikkat Gerektiren Yeni Riskler
+-------------------------------------------
+
+4.1) Bye Word Yanlis Tetiklenmesi
+---------------------------------
+"Bye BIMO" session kapatma davranisi urun hissi acisindan guzel olsa da,
+yanlis tetiklenirse kullanici deneyimini bozan bir risk olusturur.
+
+Neden?
+Cunku wake word yanlis tetiklenirse sistem bos yere acilir.
+Ama bye word yanlis tetiklenirse:
+- aktif session durduk yere kapanir
+- kullanici akisin ortasinda kopar
+- bu daha sinir bozucu hissedilebilir
+
+Bu nedenle bye modelinin yanlis tetik riskini ayrica test etmek gerekir.
+Wake ve bye ayni sey degildir;
+yanlis pozitifte verdikleri zarar farklidir.
+
+4.2) Wake Sonrasi Gecikme / Mekaniklik
+--------------------------------------
+Wake algilandiktan sonra session'a gecmeden once kullanilan bekleme,
+her ne kadar pratik bir cozum gibi dursa da,
+uzun vadede mekaniği hissettirebilir.
+
+Bu tip gecikmelerin riskleri:
+- ilk kelimelerin kacmasi
+- fazla bekleme hissi
+- "anladi ama gec cevap verdi" etkisi
+- dogalligin zedelenmesi
+
+Bu surumde bu alan hala rafine edilmeyi bekleyen bir yer olabilir.
+
+4.3) Session Kalitesi ile Memory Beklentisinin Karismasi
+--------------------------------------------------------
+Session mantigi gelince kullanici artik BIMO'dan daha buyuk bir baglam hissi
+beklemeye baslayabilir.
+Ama bu surum V2.1 oldugu icin burada memory beklentisi ile session beklentisi
+karismamali.
+
+Yani:
+- session akisi guzel olabilir
+- ama bu henuz V2.2 memory katmani demek degildir
+
+Bu ayrimi korumak onemlidir.
+Yoksa session guzel gidiyor diye memory eksikleri farkli yorumlanabilir.
+
+
+5) Somut Eksikler
+-----------------
+
+5.1) requirements.txt Hala Eksik Gorunuyor
+------------------------------------------
+Mevcut kod kullanimi dikkate alindiginda requirements dosyasinin
+projenin gercek bagimliliklarini tam temsil etmesi gerekir.
+
+Eger uygulama su anda fiilen sunlari kullaniyorsa:
+- sounddevice
+- numpy
+- pynput
+- faster-whisper
+- ollama
+- kokoro
+- webrtcvad
+- openwakeword
+
+ama requirements bunlarin hepsini icermiyorsa,
+bu dosya henuz kapanmis sayilamaz.
+
+Bu, kurulum disiplini acisindan somut bir eksiktir.
+Baska bir ortamda projeyi ayaga kaldirmayi zorlastirir.
+
+5.2) README.md'nin Bos Kalmasi
+------------------------------
+README bos kalmamalidir.
+Bu surum artik V2.1 davranisi tasidigi icin README'nin en azindan su bilgileri
+icermesi gerekir:
+
+- BIMO projesi nedir?
+- V1 neydi?
+- V2.1 ile ne geldi?
+- wake word ve session mantigi nasil calisir?
+- nasil baslatilir?
+- temel bagimliliklar neler?
+- manual fallback var mi?
+- mevcut sinirlar neler?
+
+README olmadan proje calisiyor olabilir ama okunur ve tasinabilir bir urun
+dokumani olamaz.
+
+5.3) Wake / Bye Test Sonuclarinin Yazili Olmamasi
+-------------------------------------------------
+Bu surumde artik yalnizca "calisiyor gibi" demek yetmez.
+Wake ve bye tarafinda en azindan su testlerin gozlenmesi gerekir:
+
+- wake false positive sayisi
+- wake false negative sayisi
+- bye false positive sayisi
+- bye false negative sayisi
+- sessiz ortam ve gürültülü ortam farki
+- ayni session icinde birkac tur etkilesim
+
+Bu testler kod degil; ama yazili not veya checklist olarak tutulursa
+V2.1 kapanisi daha bilincli olur.
+
+
+6) V2.1 Acisindan Bu Surumun Olgunluk Seviyesi
+----------------------------------------------
+Bu surume bakarak su yorum rahatca yapilabilir:
+
+- wake word sadece fikir olmaktan cikmis
+- session mode gercekten sisteme girmis
+- urun hissi V1'e gore ciddi sekilde artmis
+- interaction artik daha "canli" his vermeye baslamis
+- ama teknik temizlik hala tam kapanmis degil
+
+Yani bu surum:
+tam temiz bir nihai V2.1 degil
+ama
+gercek bir V2.1 prototipi.
+
+Bu ayrim onemlidir.
+Cunku burada temel soru artik "oluyor mu?" degil;
+"bunu nasil temizce kapatiriz?" olmaya baslar.
+
+
+7) Bundan Sonra Ne Yapilmali?
+----------------------------
+Bu surumden sonra en dogru sira su gorunmektedir:
+
+1. requirements dosyasini gercek bagimliliklarla hizala
+2. README'yi doldur
+3. wake ve bye icin basit yazili test notlari tut
+4. session akisini gozlemle ve yanlis kapanma / gecikme notlarini cikar
+5. main.py'nin tasidigi agirligi fark et ama hemen bolmeye zorlama
+6. V2.1 kapanisina yaklasirken "mimari temizlik" basligi ac
+
+Bu siranin mantigi su:
+su anda yeni ozellik eklemekten cok,
+mevcut V2.1'in dogru kapatilmasi daha degerli.
+
+Ozellikle:
+- memory
+- bilgisayar kontrolu
+- Spotify
+- web arastirma
+gibi seyler bu asamada acilmamalidir.
+
+
+8) Sonuc
+--------
+Bu surumle birlikte BIMO'nun wake word tarafi ciddi bicimde olgunlasmis
+gorunmektedir.
+
+En onemli kazanımlar:
+- wake -> session davranisi
+- bye ile session kapatma
+- daha dogal etkilesim hissi
+- settings tarafinin merkezilesmesi
+- V2.1'in urun tarafina yaklasilmasi
+
+En onemli kalan borclar:
+- main.py'nin fazla yuk tasimasi
+- requirements'in eksikligi
+- README'nin boslugu
+- wake/bye yanlis tetik testlerinin yazili hale gelmemesi
+- state makinesinin tam olgunlasmamis olmasi
+
+Bu nedenle en dogru teknik yargi sunlardir:
+BIMO.v2.1 artik gercek bir wake-word ve session prototipi haline gelmistir.
+Simdi ihtiyac olan sey daha fazla ozellik degil;
+bu session tabanli etkilesimi duzgun dokumante etmek, kurulumunu duzgunlestirmek
+ve davranissal testlerini netlestirmektir.
+
+Kisacasi:
+V2.1'in ruhu oturuyor.
+Simdi sira onu temizce kapatmakta.
