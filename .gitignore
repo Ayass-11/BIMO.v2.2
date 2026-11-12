@@ -1,2 +1,18 @@
-
+# Python
+__pycache__/
+*.py[cod]
 .venv/
+.env
+*.egg-info/
+
+# Local logs
+logs/
+*.log
+
+# Kendi sesinden alınan örnekler (kişisel veri)
+data/wakeword/
+
+# Editör / OS
+.vscode/
+.idea/
+.DS_Store

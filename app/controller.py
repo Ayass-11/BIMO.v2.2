@@ -1,4 +1,7 @@
+
+import time
 from app.state import BIMOState
+
 
 class Controller:
     def __init__(self, stt, llm, tts):
@@ -17,8 +20,13 @@ class Controller:
 
             self.set_state(BIMOState.TRANSCRIBING)
             try:
+                t0 = time.perf_counter()
                 text = self.stt.transcribe(audio_input)
+                t1 = time.perf_counter()
+
                 print(f"[STT] '{text}'")
+                print(f"[TIMING] STT: {t1 - t0:.2f}s")
+
             except Exception as e:
                 print(f"[ERROR][STT] {e}")
                 self.set_state(BIMOState.IDLE)
@@ -31,8 +39,13 @@ class Controller:
 
             self.set_state(BIMOState.THINKING)
             try:
+                t2 = time.perf_counter()
                 response = self.llm.respond(text)
+                t3 = time.perf_counter()
+
                 print(f"[LLM] '{response}'")
+                print(f"[TIMING] LLM: {t3 - t2:.2f}s")
+
             except Exception as e:
                 print(f"[ERROR][LLM] {e}")
                 self.set_state(BIMOState.IDLE)
@@ -45,7 +58,19 @@ class Controller:
 
             self.set_state(BIMOState.SPEAKING)
             try:
+                t4 = time.perf_counter()
                 self.tts.speak(response)
+                t5 = time.perf_counter()
+
+                stt_time = t1 - t0
+                llm_time = t3 - t2
+                tts_time = t5 - t4
+                total_time = t5 - t0
+
+                print(f"[TIMING] TTS Total: {tts_time:.2f}s")
+                print(f"[TIMING] STT + LLM: {stt_time + llm_time:.2f}s")
+                print(f"[TIMING] Total elapsed: {total_time:.2f}s")
+
             except Exception as e:
                 print(f"[ERROR][TTS] {e}")
                 self.set_state(BIMOState.IDLE)
@@ -57,3 +82,4 @@ class Controller:
             self.set_state(BIMOState.ERROR)
             print(f"[ERROR][UNKNOWN] {e}")
             self.state = BIMOState.IDLE
+
